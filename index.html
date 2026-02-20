@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1f6a5c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Workout Coach" />
+    <title>Workout Coach</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>Workout Coach</h1>
+        <p>Smart split planning, progression, timers, and calorie estimates.</p>
+        <div class="button-row">
+          <button id="installAppBtn" type="button" hidden>Install App</button>
+        </div>
+      </header>
+
+      <section class="card controls">
+        <h2>Session Setup</h2>
+        <div class="grid">
+          <label>
+            Active profile
+            <select id="profileSelect"></select>
+          </label>
+          <label>
+            New profile name
+            <input id="newProfileName" type="text" placeholder="e.g. Alex" />
+          </label>
+          <label>
+            Profile actions
+            <div class="button-row">
+              <button id="addProfile" type="button">Add Profile</button>
+              <button id="deleteProfile" type="button" class="danger">Delete</button>
+            </div>
+          </label>
+          <label>
+            Body weight (kg)
+            <input id="bodyWeight" type="number" min="30" max="250" value="75" />
+          </label>
+          <label>
+            Session date
+            <input id="sessionDate" type="date" />
+          </label>
+          <label>
+            Training level
+            <select id="level">
+              <option value="beginner">Beginner</option>
+              <option value="intermediate" selected>Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+          </label>
+          <label>
+            Rounds
+            <input id="rounds" type="number" min="4" max="4" value="4" readonly />
+          </label>
+        </div>
+        <div class="grid">
+          <label>
+            Injury constraints (comma separated)
+            <input id="injuries" type="text" placeholder="knee, shoulder, lower back" />
+          </label>
+          <fieldset class="equip-field">
+            <legend>Equipment Available</legend>
+            <label><input type="checkbox" id="eqBarbell" checked /> Barbell</label>
+            <label><input type="checkbox" id="eqDumbbell" checked /> Dumbbell</label>
+            <label><input type="checkbox" id="eqCable" checked /> Cable</label>
+            <label><input type="checkbox" id="eqKettlebell" checked /> Kettlebell</label>
+            <label><input type="checkbox" id="eqBodyweight" checked /> Bodyweight</label>
+            <label><input type="checkbox" id="eqMachine" checked /> Machine</label>
+          </fieldset>
+        </div>
+        <div class="button-row">
+          <button id="exportData" type="button">Export Data</button>
+          <button id="importDataBtn" type="button">Import Data</button>
+          <input id="importDataFile" type="file" accept="application/json" hidden />
+        </div>
+        <button id="buildPlan">Build Workout Plan</button>
+      </section>
+
+      <section class="card" id="scheduleCard">
+        <h2>Recommended Weekly Split</h2>
+        <div id="weeklySplit"></div>
+      </section>
+
+      <section class="card" id="planCard">
+        <h2>Workout Plan</h2>
+        <div id="planOutput" class="muted">Build a plan to start.</div>
+      </section>
+
+      <section class="card" id="timerCard">
+        <h2>Session Timer</h2>
+        <div class="timer-box">
+          <p class="timer-label" id="timerLabel">Waiting to start</p>
+          <p class="timer" id="timerValue">00:00</p>
+          <button id="startTimer" disabled>Start Guided Session</button>
+          <button id="skipStep" disabled>Skip Step</button>
+        </div>
+      </section>
+
+      <section class="card" id="progressCard">
+        <h2>Progress & Calories</h2>
+        <div id="calorieOutput" class="muted">Calories will be estimated after plan generation.</div>
+        <div id="completionOutput" class="muted">Complete session to save progression.</div>
+        <div class="button-row">
+          <button id="getAiSuggestion" type="button">Get AI Suggestion</button>
+        </div>
+        <div id="aiSuggestionOutput" class="muted">Build a plan, then ask AI for workout and progression suggestions.</div>
+      </section>
+
+      <section class="card" id="logCard">
+        <h2>Set Logging</h2>
+        <div id="logOutput" class="muted">Build a workout plan to log reps and RPE per set.</div>
+        <button id="saveLog" type="button" disabled>Save Set Performance</button>
+      </section>
+    </main>
+
+    <nav class="mobile-quick-actions" aria-label="Quick actions">
+      <button id="qaBuild" type="button">Build</button>
+      <button id="qaStart" type="button">Start</button>
+      <button id="qaSave" type="button">Save</button>
+      <button id="qaAi" type="button">AI</button>
+    </nav>
+
+    <script src="app.js"></script>
+  </body>
+</html>

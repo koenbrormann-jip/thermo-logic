@@ -1,0 +1,17 @@
+{
+  "name": "Workout Coach",
+  "short_name": "Workout",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f1e8",
+  "theme_color": "#1f6a5c",
+  "description": "Coach-style workout planner with timers, progression, and AI suggestions.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
