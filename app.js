@@ -41,6 +41,21 @@ const ui = {
   playAgainBtn: document.getElementById("playAgainBtn")
 };
 
+async function cleanupLegacyOfflineCache() {
+  if (typeof window === "undefined") return;
+
+  if (typeof navigator !== "undefined" && navigator.serviceWorker?.getRegistrations) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  }
+
+  if (window.caches?.keys) {
+    const keys = await window.caches.keys();
+    const staleKeys = keys.filter((key) => key.startsWith("workout-coach"));
+    await Promise.all(staleKeys.map((key) => window.caches.delete(key)));
+  }
+}
+
 function randomInt(max) {
   return Math.floor(Math.random() * max);
 }
@@ -888,7 +903,9 @@ function wireEvents() {
   });
 }
 
-wireEvents();
+cleanupLegacyOfflineCache().finally(() => {
+  wireEvents();
+});
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
