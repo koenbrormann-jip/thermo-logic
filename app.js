@@ -602,10 +602,6 @@ function tryPlaceSelected(value) {
     return;
   }
 
-  const prevLineStates = deepCopyLineStates(appState.lineStates);
-  const prevValue = appState.grid[r][c];
-  const prevUserOrder = appState.userOrder.map((e) => ({ ...e }));
-
   if (value === 0) {
     setCellValue(r, c, 0);
     appState.lastInvalid = null;
@@ -637,20 +633,6 @@ function tryPlaceSelected(value) {
   }
 
   setCellValue(r, c, value);
-
-  const boardForSolve = appState.grid.map((row) => row.slice());
-  const statesForSolve = deepCopyLineStates(appState.lineStates);
-  const solvable = isSolvableAfterMove(boardForSolve, statesForSolve, appState.config);
-
-  if (!solvable) {
-    appState.grid[r][c] = prevValue;
-    appState.userOrder = prevUserOrder;
-    appState.lineStates = prevLineStates;
-    appState.lastInvalid = { r, c };
-    ui.statusText.textContent = "Move rejected: creates an unsolvable thermal lock-out.";
-    renderGrid();
-    return;
-  }
 
   appState.lastInvalid = null;
   ui.statusText.textContent = `Placed ${value} at R${r + 1} C${c + 1}.`;
@@ -702,12 +684,6 @@ function isBoardCompleteAndValid() {
         }
         if (set.size !== size) return false;
       }
-    }
-  }
-
-  for (let r = 0; r < size; r += 1) {
-    for (let c = 0; c < size; c += 1) {
-      if (appState.grid[r][c] !== appState.solution[r][c]) return false;
     }
   }
 
