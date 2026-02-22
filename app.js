@@ -1,722 +1,790 @@
-const splitTemplate = {
-  Monday: "Lower Body",
-  Tuesday: "Mobility / Recovery",
-  Wednesday: "Core + Conditioning",
-  Thursday: "Upper Body",
-  Friday: "Cardio + Recovery",
-  Saturday: "Total Body",
-  Sunday: "Rest"
+const DIFFICULTIES = {
+  stable: { label: "Stable", size: 4, rowTrends: true, colTrends: false, maskRatio: 0.6, useBlocks: false },
+  critical: { label: "Critical", size: 5, rowTrends: true, colTrends: true, maskRatio: 0.6, useBlocks: false },
+  meltdown: { label: "Meltdown", size: 6, rowTrends: true, colTrends: true, maskRatio: 0.72, useBlocks: false },
+  supernova: { label: "Supernova", size: 9, rowTrends: true, colTrends: true, maskRatio: 0.65, useBlocks: true }
 };
-
-const storageKey = "workout_coach_data_v2";
-
-const defaultEquipment = {
-  barbell: true,
-  dumbbell: true,
-  cable: true,
-  kettlebell: true,
-  bodyweight: true,
-  machine: true
-};
-
-const exerciseLibrary = {
-  "Upper Body": [
-    { name: "Barbell Bench Press", bodyPart: "Chest", type: "strength", movement: "push", equipment: ["barbell"], avoid: ["shoulder"], met: 6.0, base: { beginner: 25, intermediate: 45, advanced: 65 } },
-    { name: "Dumbbell Shoulder Press", bodyPart: "Shoulders", type: "strength", movement: "push", equipment: ["dumbbell"], avoid: ["shoulder"], met: 5.8, base: { beginner: 12, intermediate: 18, advanced: 24 } },
-    { name: "Bent-Over Row", bodyPart: "Back", type: "strength", movement: "pull", equipment: ["barbell"], avoid: ["lower back"], met: 6.2, base: { beginner: 20, intermediate: 35, advanced: 50 } },
-    { name: "Pull-Up (Weighted if needed)", bodyPart: "Back", type: "strength", movement: "pull", equipment: ["bodyweight"], avoid: ["shoulder"], met: 7.0, base: { beginner: 0, intermediate: 5, advanced: 12 } },
-    { name: "Incline Dumbbell Press", bodyPart: "Chest", type: "strength", movement: "push", equipment: ["dumbbell"], avoid: ["shoulder"], met: 5.8, base: { beginner: 10, intermediate: 16, advanced: 22 } },
-    { name: "Cable Face Pull", bodyPart: "Rear Delts", type: "accessory", movement: "pull", equipment: ["cable"], avoid: [], met: 4.8, base: { beginner: 12, intermediate: 20, advanced: 30 } },
-    { name: "Triceps Rope Pressdown", bodyPart: "Triceps", type: "accessory", movement: "push", equipment: ["cable"], avoid: ["elbow"], met: 4.5, base: { beginner: 10, intermediate: 16, advanced: 24 } },
-    { name: "Hammer Curl", bodyPart: "Biceps", type: "accessory", movement: "pull", equipment: ["dumbbell"], avoid: ["elbow"], met: 4.5, base: { beginner: 8, intermediate: 12, advanced: 18 } }
-  ],
-  "Lower Body": [
-    { name: "Back Squat", bodyPart: "Quads/Glutes", type: "strength", movement: "squat", equipment: ["barbell"], avoid: ["knee", "lower back"], met: 7.0, base: { beginner: 35, intermediate: 60, advanced: 90 } },
-    { name: "Romanian Deadlift", bodyPart: "Hamstrings", type: "strength", movement: "hinge", equipment: ["barbell", "dumbbell"], avoid: ["lower back", "hamstring"], met: 6.8, base: { beginner: 30, intermediate: 55, advanced: 80 } },
-    { name: "Walking Lunges", bodyPart: "Quads", type: "strength", movement: "lunge", equipment: ["dumbbell", "bodyweight"], avoid: ["knee"], met: 6.0, base: { beginner: 8, intermediate: 14, advanced: 20 } },
-    { name: "Leg Press", bodyPart: "Quads", type: "strength", movement: "squat", equipment: ["machine"], avoid: ["knee"], met: 6.5, base: { beginner: 70, intermediate: 130, advanced: 190 } },
-    { name: "Hip Thrust", bodyPart: "Glutes", type: "strength", movement: "hinge", equipment: ["barbell", "dumbbell"], avoid: ["lower back"], met: 6.2, base: { beginner: 35, intermediate: 70, advanced: 110 } },
-    { name: "Calf Raise", bodyPart: "Calves", type: "accessory", movement: "calves", equipment: ["machine", "bodyweight"], avoid: [], met: 4.2, base: { beginner: 20, intermediate: 35, advanced: 50 } },
-    { name: "Hamstring Curl", bodyPart: "Hamstrings", type: "accessory", movement: "hinge", equipment: ["machine"], avoid: ["hamstring"], met: 4.6, base: { beginner: 15, intermediate: 25, advanced: 40 } },
-    { name: "Goblet Squat", bodyPart: "Quads/Core", type: "strength", movement: "squat", equipment: ["dumbbell", "kettlebell"], avoid: ["knee"], met: 5.5, base: { beginner: 12, intermediate: 20, advanced: 30 } }
-  ],
-  "Total Body": [
-    { name: "Deadlift", bodyPart: "Posterior Chain", type: "strength", movement: "hinge", equipment: ["barbell"], avoid: ["lower back"], met: 7.4, base: { beginner: 40, intermediate: 70, advanced: 110 } },
-    { name: "Thruster", bodyPart: "Total Body", type: "strength", movement: "squat", equipment: ["barbell", "dumbbell"], avoid: ["shoulder", "knee"], met: 7.6, base: { beginner: 15, intermediate: 25, advanced: 35 } },
-    { name: "Kettlebell Swing", bodyPart: "Hips/Core", type: "conditioning", movement: "hinge", equipment: ["kettlebell"], avoid: ["lower back"], met: 8.0, base: { beginner: 12, intermediate: 20, advanced: 28 } },
-    { name: "Renegade Row", bodyPart: "Core/Back", type: "strength", movement: "pull", equipment: ["dumbbell"], avoid: ["shoulder"], met: 6.8, base: { beginner: 8, intermediate: 12, advanced: 18 } },
-    { name: "Push Press", bodyPart: "Shoulders", type: "strength", movement: "push", equipment: ["barbell", "dumbbell"], avoid: ["shoulder"], met: 6.8, base: { beginner: 20, intermediate: 35, advanced: 50 } },
-    { name: "Front Squat", bodyPart: "Quads/Core", type: "strength", movement: "squat", equipment: ["barbell"], avoid: ["knee", "lower back"], met: 6.9, base: { beginner: 25, intermediate: 45, advanced: 70 } },
-    { name: "Burpee to Broad Jump", bodyPart: "Conditioning", type: "conditioning", movement: "conditioning", equipment: ["bodyweight"], avoid: ["knee", "shoulder"], met: 8.5, base: { beginner: 0, intermediate: 0, advanced: 0 } },
-    { name: "Farmer Carry", bodyPart: "Grip/Core", type: "conditioning", movement: "carry", equipment: ["dumbbell", "kettlebell"], avoid: ["lower back"], met: 6.0, base: { beginner: 16, intermediate: 24, advanced: 34 } }
-  ]
-};
-
-const fallbackExercises = [
-  { name: "Bodyweight Squat", bodyPart: "Legs", type: "strength", movement: "squat", equipment: ["bodyweight"], avoid: ["knee"], met: 4.8, base: { beginner: 0, intermediate: 0, advanced: 0 } },
-  { name: "Wall Push-Up", bodyPart: "Chest", type: "strength", movement: "push", equipment: ["bodyweight"], avoid: ["shoulder"], met: 4.5, base: { beginner: 0, intermediate: 0, advanced: 0 } },
-  { name: "Bird Dog", bodyPart: "Core", type: "accessory", movement: "core", equipment: ["bodyweight"], avoid: [], met: 3.8, base: { beginner: 0, intermediate: 0, advanced: 0 } },
-  { name: "Glute Bridge", bodyPart: "Glutes", type: "strength", movement: "hinge", equipment: ["bodyweight"], avoid: [], met: 4.2, base: { beginner: 0, intermediate: 0, advanced: 0 } }
-];
 
 const appState = {
-  currentPlan: null,
-  timerQueue: [],
+  config: null,
+  size: 0,
+  solution: [],
+  grid: [],
+  givenMask: [],
+  userOrder: [],
+  selected: null,
+  rowInitialTrends: [],
+  colInitialTrends: [],
+  lineStates: null,
+  lastInvalid: null,
+  gameStartMs: 0,
   timerId: null,
-  timerSeconds: 0,
-  queueIndex: 0,
-  activeStep: null,
-  store: null
+  solved: false
 };
 
 const ui = {
-  profileSelect: document.getElementById("profileSelect"),
-  installAppBtn: document.getElementById("installAppBtn"),
-  qaBuild: document.getElementById("qaBuild"),
-  qaStart: document.getElementById("qaStart"),
-  qaSave: document.getElementById("qaSave"),
-  qaAi: document.getElementById("qaAi"),
-  newProfileName: document.getElementById("newProfileName"),
-  addProfile: document.getElementById("addProfile"),
-  deleteProfile: document.getElementById("deleteProfile"),
-  bodyWeight: document.getElementById("bodyWeight"),
-  sessionDate: document.getElementById("sessionDate"),
-  level: document.getElementById("level"),
-  injuries: document.getElementById("injuries"),
-  eqBarbell: document.getElementById("eqBarbell"),
-  eqDumbbell: document.getElementById("eqDumbbell"),
-  eqCable: document.getElementById("eqCable"),
-  eqKettlebell: document.getElementById("eqKettlebell"),
-  eqBodyweight: document.getElementById("eqBodyweight"),
-  eqMachine: document.getElementById("eqMachine"),
-  exportData: document.getElementById("exportData"),
-  importDataBtn: document.getElementById("importDataBtn"),
-  importDataFile: document.getElementById("importDataFile"),
-  buildPlan: document.getElementById("buildPlan"),
-  weeklySplit: document.getElementById("weeklySplit"),
-  planOutput: document.getElementById("planOutput"),
-  calorieOutput: document.getElementById("calorieOutput"),
-  completionOutput: document.getElementById("completionOutput"),
-  getAiSuggestion: document.getElementById("getAiSuggestion"),
-  aiSuggestionOutput: document.getElementById("aiSuggestionOutput"),
-  timerLabel: document.getElementById("timerLabel"),
+  landing: document.getElementById("landing"),
+  game: document.getElementById("game"),
+  difficultyLabel: document.getElementById("difficultyLabel"),
+  gridWrap: document.getElementById("gridWrap"),
+  statusText: document.getElementById("statusText"),
   timerValue: document.getElementById("timerValue"),
-  startTimer: document.getElementById("startTimer"),
-  skipStep: document.getElementById("skipStep"),
-  logOutput: document.getElementById("logOutput"),
-  saveLog: document.getElementById("saveLog")
+  resetRowBtn: document.getElementById("resetRowBtn"),
+  resetColBtn: document.getElementById("resetColBtn"),
+  restartBtn: document.getElementById("restartBtn"),
+  backBtn: document.getElementById("backBtn"),
+  winPanel: document.getElementById("winPanel"),
+  winTime: document.getElementById("winTime"),
+  playAgainBtn: document.getElementById("playAgainBtn")
 };
 
-let deferredInstallPrompt = null;
+function randomInt(max) {
+  return Math.floor(Math.random() * max);
+}
 
-const DataAgent = {
-  loadStore() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(storageKey) || "{}");
-      if (parsed && parsed.profiles && parsed.activeProfileId) return parsed;
-    } catch {
-      // use fallback
-    }
-    const id = this.generateId();
-    return {
-      activeProfileId: id,
-      profiles: {
-        [id]: {
-          id,
-          name: "Default User",
-          bodyWeightKg: 75,
-          level: "intermediate",
-          injuries: [],
-          equipment: { ...defaultEquipment },
-          progress: {},
-          logs: []
+function shuffledRange(min, max) {
+  const arr = [];
+  for (let i = min; i <= max; i += 1) arr.push(i);
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = randomInt(i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function formatTime(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const min = String(Math.floor(totalSec / 60)).padStart(2, "0");
+  const sec = String(totalSec % 60).padStart(2, "0");
+  return `${min}:${sec}`;
+}
+
+function initializeGrid(size, value = 0) {
+  return Array.from({ length: size }, () => Array(size).fill(value));
+}
+
+function initializeBoolGrid(size, value = false) {
+  return Array.from({ length: size }, () => Array(size).fill(value));
+}
+
+function blockSizeFor(size) {
+  return size === 9 ? 3 : 0;
+}
+
+function generateSolvedBoard(config) {
+  const size = config.size;
+  const grid = initializeGrid(size, 0);
+  const rowUsed = Array.from({ length: size }, () => new Set());
+  const colUsed = Array.from({ length: size }, () => new Set());
+  const blockUsed = config.useBlocks ? Array.from({ length: size }, () => new Set()) : [];
+
+  function blockIndex(r, c) {
+    const b = blockSizeFor(size);
+    return Math.floor(r / b) * b + Math.floor(c / b);
+  }
+
+  function candidates(r, c) {
+    const list = shuffledRange(1, size);
+    return list.filter((n) => {
+      if (rowUsed[r].has(n) || colUsed[c].has(n)) return false;
+      if (config.useBlocks && blockUsed[blockIndex(r, c)].has(n)) return false;
+      return true;
+    });
+  }
+
+  function pickNextCell() {
+    let best = null;
+    let bestCount = Infinity;
+    for (let r = 0; r < size; r += 1) {
+      for (let c = 0; c < size; c += 1) {
+        if (grid[r][c] !== 0) continue;
+        const count = candidates(r, c).length;
+        if (count < bestCount) {
+          bestCount = count;
+          best = { r, c };
+          if (count === 1) return best;
         }
       }
-    };
-  },
-  saveStore(store) {
-    localStorage.setItem(storageKey, JSON.stringify(store));
-  },
-  generateId() {
-    return `p_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+    }
+    return best;
   }
-};
 
-const ProfileAgent = {
-  getActiveProfile() {
-    return appState.store.profiles[appState.store.activeProfileId];
-  },
-  renderProfileSelect() {
-    const options = Object.values(appState.store.profiles)
-      .map((p) => `<option value="${p.id}">${p.name}</option>`)
-      .join("");
-    ui.profileSelect.innerHTML = options;
-    ui.profileSelect.value = appState.store.activeProfileId;
-  },
-  syncProfileToForm() {
-    const profile = this.getActiveProfile();
-    ui.bodyWeight.value = profile.bodyWeightKg;
-    ui.level.value = profile.level;
-    ui.injuries.value = profile.injuries.join(", ");
-    ui.eqBarbell.checked = Boolean(profile.equipment.barbell);
-    ui.eqDumbbell.checked = Boolean(profile.equipment.dumbbell);
-    ui.eqCable.checked = Boolean(profile.equipment.cable);
-    ui.eqKettlebell.checked = Boolean(profile.equipment.kettlebell);
-    ui.eqBodyweight.checked = Boolean(profile.equipment.bodyweight);
-    ui.eqMachine.checked = Boolean(profile.equipment.machine);
-  },
-  syncFormToProfile() {
-    const profile = this.getActiveProfile();
-    profile.bodyWeightKg = Number(ui.bodyWeight.value || 75);
-    profile.level = ui.level.value;
-    profile.injuries = ui.injuries.value
-      .split(",")
-      .map((x) => x.trim().toLowerCase())
-      .filter(Boolean);
-    profile.equipment = {
-      barbell: ui.eqBarbell.checked,
-      dumbbell: ui.eqDumbbell.checked,
-      cable: ui.eqCable.checked,
-      kettlebell: ui.eqKettlebell.checked,
-      bodyweight: ui.eqBodyweight.checked,
-      machine: ui.eqMachine.checked
-    };
-    DataAgent.saveStore(appState.store);
-  },
-  addProfile(name) {
-    const profileName = (name || "").trim() || `User ${Object.keys(appState.store.profiles).length + 1}`;
-    const id = DataAgent.generateId();
-    appState.store.profiles[id] = {
-      id,
-      name: profileName,
-      bodyWeightKg: 75,
-      level: "intermediate",
-      injuries: [],
-      equipment: { ...defaultEquipment },
-      progress: {},
-      logs: []
-    };
-    appState.store.activeProfileId = id;
-    DataAgent.saveStore(appState.store);
-    this.renderProfileSelect();
-    this.syncProfileToForm();
-    ui.newProfileName.value = "";
-  },
-  deleteActiveProfile() {
-    const ids = Object.keys(appState.store.profiles);
-    if (ids.length <= 1) {
-      ui.completionOutput.textContent = "At least one profile is required.";
-      return;
-    }
-    delete appState.store.profiles[appState.store.activeProfileId];
-    appState.store.activeProfileId = Object.keys(appState.store.profiles)[0];
-    DataAgent.saveStore(appState.store);
-    this.renderProfileSelect();
-    this.syncProfileToForm();
-    ui.completionOutput.textContent = "Profile deleted.";
-  },
-  exportData() {
-    const blob = new Blob([JSON.stringify(appState.store, null, 2)], { type: "application/json" });
-    const link = document.createElement("a");
-    const now = new Date().toISOString().slice(0, 10);
-    link.href = URL.createObjectURL(blob);
-    link.download = `workout-coach-export-${now}.json`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  },
-  importData(text) {
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      ui.completionOutput.textContent = "Import failed: invalid JSON file.";
-      return;
-    }
-    if (!parsed || typeof parsed !== "object" || !parsed.profiles || !parsed.activeProfileId) {
-      ui.completionOutput.textContent = "Import failed: unexpected data format.";
-      return;
-    }
+  function dfs() {
+    const cell = pickNextCell();
+    if (!cell) return true;
 
-    appState.store = parsed;
-    if (!appState.store.profiles[appState.store.activeProfileId]) {
-      appState.store.activeProfileId = Object.keys(appState.store.profiles)[0];
-    }
-    DataAgent.saveStore(appState.store);
-    this.renderProfileSelect();
-    this.syncProfileToForm();
-    ui.completionOutput.textContent = "Data imported successfully.";
-  }
-};
+    const opts = candidates(cell.r, cell.c);
+    if (!opts.length) return false;
 
-const ProgressionAgent = {
-  getProgressForExercise(profile, exercise) {
-    return profile.progress[exercise.name] || { sessions: 0, successStreak: 0, failStreak: 0, lastAvgRpe: 0, lastAvgReps: 0, weight: 0 };
-  },
-  getTargetWeight(profile, exercise, level) {
-    const base = exercise.base[level] ?? exercise.base.intermediate ?? 0;
-    if (base <= 0) return 0;
-
-    const history = this.getProgressForExercise(profile, exercise);
-    return Number((history.weight || base).toFixed(1));
-  },
-  updateFromSetLog(profile, entries) {
-    entries.forEach((entry) => {
-      if (!entry.exercise || entry.targetWeight <= 0) return;
-
-      const item = this.getProgressForExercise(profile, entry.exercise);
-      const reps = entry.sets.map((s) => s.reps).filter((v) => Number.isFinite(v));
-      const rpes = entry.sets.map((s) => s.rpe).filter((v) => Number.isFinite(v));
-      const avgReps = reps.length ? reps.reduce((a, b) => a + b, 0) / reps.length : 0;
-      const avgRpe = rpes.length ? rpes.reduce((a, b) => a + b, 0) / rpes.length : 9.5;
-      const successful = avgReps >= 8 && avgRpe <= 9.2;
-
-      let nextWeight = entry.targetWeight;
-      if (successful && avgRpe <= 8.0) {
-        nextWeight = roundToPlate(entry.targetWeight * 1.03);
-        item.successStreak += 1;
-        item.failStreak = 0;
-      } else if (successful) {
-        nextWeight = item.successStreak >= 1 ? roundToPlate(entry.targetWeight * 1.015) : entry.targetWeight;
-        item.successStreak += 1;
-        item.failStreak = 0;
-      } else {
-        nextWeight = roundToPlate(entry.targetWeight * 0.975);
-        item.successStreak = 0;
-        item.failStreak += 1;
+    for (const n of opts) {
+      grid[cell.r][cell.c] = n;
+      rowUsed[cell.r].add(n);
+      colUsed[cell.c].add(n);
+      let bIdx = -1;
+      if (config.useBlocks) {
+        bIdx = blockIndex(cell.r, cell.c);
+        blockUsed[bIdx].add(n);
       }
 
-      item.weight = Math.max(nextWeight, 2.5);
-      item.sessions += 1;
-      item.lastAvgReps = Number(avgReps.toFixed(2));
-      item.lastAvgRpe = Number(avgRpe.toFixed(2));
-      profile.progress[entry.exercise.name] = item;
-    });
-  }
-};
+      if (dfs()) return true;
 
-const PlanningAgent = {
-  getDayName(dateText) {
-    const date = new Date(`${dateText}T12:00:00`);
-    return date.toLocaleDateString("en-US", { weekday: "long" });
-  },
-  getFocusForDay(dayName) {
-    return splitTemplate[dayName] || "Total Body";
-  },
-  isExerciseAllowed(exercise, profile) {
-    const hasEquipment = exercise.equipment.some((item) => profile.equipment[item]);
-    if (!hasEquipment) return false;
-
-    const injuryConflict = exercise.avoid.some((flag) => profile.injuries.includes(flag));
-    return !injuryConflict;
-  },
-  substituteExercise(exercise, focus, profile) {
-    if (this.isExerciseAllowed(exercise, profile)) return { ...exercise, substitutedFrom: null };
-
-    const candidates = [...(exerciseLibrary[focus] || []), ...exerciseLibrary["Total Body"], ...fallbackExercises];
-    const replacement = candidates.find((item) => {
-      return item.name !== exercise.name
-        && this.isExerciseAllowed(item, profile)
-        && (item.movement === exercise.movement || item.type === exercise.type);
-    });
-
-    if (replacement) {
-      return { ...replacement, substitutedFrom: exercise.name };
+      grid[cell.r][cell.c] = 0;
+      rowUsed[cell.r].delete(n);
+      colUsed[cell.c].delete(n);
+      if (config.useBlocks) blockUsed[bIdx].delete(n);
     }
 
-    return { ...fallbackExercises.find((item) => this.isExerciseAllowed(item, profile)) || fallbackExercises[0], substitutedFrom: exercise.name };
-  },
-  pickExercises(focus, profile, rounds = 4) {
-    const pool = [...(exerciseLibrary[focus] || exerciseLibrary["Total Body"])];
-    const selected = [];
+    return false;
+  }
 
-    while (selected.length < rounds * 2) {
-      if (!pool.length) {
-        selected.push(this.substituteExercise(fallbackExercises[selected.length % fallbackExercises.length], focus, profile));
-        continue;
+  const solved = dfs();
+  if (!solved) throw new Error("Failed to generate solved board");
+  return grid;
+}
+
+function buildInitialTrends(size, applies) {
+  if (!applies) return Array(size).fill(1);
+  return Array.from({ length: size }, () => (Math.random() < 0.5 ? 1 : -1));
+}
+
+function getLineStateFromOrder(values, initialTrend, maxVal) {
+  let trend = initialTrend;
+  let last = null;
+  for (const value of values) {
+    last = value;
+    if (trend === 1 && value === maxVal) {
+      trend = -1;
+    } else if (trend === -1 && value === 1) {
+      trend = 1;
+    }
+  }
+  return { trend, last };
+}
+
+function computeLineStates(grid, givenMask, userOrder, rowInitialTrends, colInitialTrends, config) {
+  const size = config.size;
+  const rowEvents = Array.from({ length: size }, () => []);
+  const colEvents = Array.from({ length: size }, () => []);
+
+  const byCell = new Map();
+  for (const event of userOrder) {
+    byCell.set(`${event.r},${event.c}`, event);
+  }
+
+  byCell.forEach((event) => {
+    const value = grid[event.r][event.c];
+    if (!value || givenMask[event.r][event.c]) return;
+    rowEvents[event.r].push({ order: event.order, value });
+    colEvents[event.c].push({ order: event.order, value });
+  });
+
+  const rowStates = rowEvents.map((events, i) => {
+    events.sort((a, b) => a.order - b.order);
+    const seq = events.map((e) => e.value);
+    return getLineStateFromOrder(seq, rowInitialTrends[i], size);
+  });
+
+  const colStates = colEvents.map((events, i) => {
+    events.sort((a, b) => a.order - b.order);
+    const seq = events.map((e) => e.value);
+    return getLineStateFromOrder(seq, colInitialTrends[i], size);
+  });
+
+  return { rowStates, colStates };
+}
+
+function hasDuplicateInLine(grid, r, c, value) {
+  for (let i = 0; i < appState.size; i += 1) {
+    if (i !== c && grid[r][i] === value) return true;
+    if (i !== r && grid[i][c] === value) return true;
+  }
+  return false;
+}
+
+function violatesBlock(grid, r, c, value) {
+  if (!appState.config.useBlocks) return false;
+  const b = blockSizeFor(appState.size);
+  const sr = Math.floor(r / b) * b;
+  const sc = Math.floor(c / b) * b;
+  for (let rr = sr; rr < sr + b; rr += 1) {
+    for (let cc = sc; cc < sc + b; cc += 1) {
+      if ((rr !== r || cc !== c) && grid[rr][cc] === value) return true;
+    }
+  }
+  return false;
+}
+
+function thermalLegalForLine(state, value, enabled) {
+  if (!enabled) return true;
+  if (state.last == null) return true;
+  if (state.trend === 1) return value > state.last;
+  return value < state.last;
+}
+
+function checkMoveLegality(r, c, value, board, lineStates) {
+  if (value < 1 || value > appState.size) return { legal: false, reason: "Value out of range." };
+  if (hasDuplicateInLine(board, r, c, value)) {
+    return { legal: false, reason: "Sudoku/Latin rule violated in row or column." };
+  }
+  if (violatesBlock(board, r, c, value)) {
+    return { legal: false, reason: "Supernova block rule violated." };
+  }
+
+  const rowOk = thermalLegalForLine(lineStates.rowStates[r], value, appState.config.rowTrends);
+  if (!rowOk) return { legal: false, reason: "Row thermal trend violated." };
+
+  const colOk = thermalLegalForLine(lineStates.colStates[c], value, appState.config.colTrends);
+  if (!colOk) return { legal: false, reason: "Column thermal trend violated." };
+
+  return { legal: true, reason: "Move legal." };
+}
+
+function updateLineStateWithPlacement(state, value, maxVal) {
+  const prev = { trend: state.trend, last: state.last };
+  state.last = value;
+  if (state.trend === 1 && value === maxVal) state.trend = -1;
+  else if (state.trend === -1 && value === 1) state.trend = 1;
+  return prev;
+}
+
+function deepCopyLineStates(lineStates) {
+  return {
+    rowStates: lineStates.rowStates.map((x) => ({ trend: x.trend, last: x.last })),
+    colStates: lineStates.colStates.map((x) => ({ trend: x.trend, last: x.last }))
+  };
+}
+
+function isSolvableAfterMove(grid, lineStates) {
+  const size = appState.size;
+  const rowUsed = Array.from({ length: size }, () => new Set());
+  const colUsed = Array.from({ length: size }, () => new Set());
+  const blockUsed = appState.config.useBlocks ? Array.from({ length: size }, () => new Set()) : [];
+
+  function blockIndex(r, c) {
+    const b = blockSizeFor(size);
+    return Math.floor(r / b) * b + Math.floor(c / b);
+  }
+
+  for (let r = 0; r < size; r += 1) {
+    for (let c = 0; c < size; c += 1) {
+      const val = grid[r][c];
+      if (!val) continue;
+      if (rowUsed[r].has(val) || colUsed[c].has(val)) return false;
+      rowUsed[r].add(val);
+      colUsed[c].add(val);
+      if (appState.config.useBlocks) {
+        const bi = blockIndex(r, c);
+        if (blockUsed[bi].has(val)) return false;
+        blockUsed[bi].add(val);
+      }
+    }
+  }
+
+  const rows = lineStates.rowStates.map((s) => ({ trend: s.trend, last: s.last }));
+  const cols = lineStates.colStates.map((s) => ({ trend: s.trend, last: s.last }));
+
+  function candidateValues(r, c) {
+    const values = [];
+    for (let n = 1; n <= size; n += 1) {
+      if (rowUsed[r].has(n) || colUsed[c].has(n)) continue;
+      if (appState.config.useBlocks && blockUsed[blockIndex(r, c)].has(n)) continue;
+      if (!thermalLegalForLine(rows[r], n, appState.config.rowTrends)) continue;
+      if (!thermalLegalForLine(cols[c], n, appState.config.colTrends)) continue;
+      values.push(n);
+    }
+    return values;
+  }
+
+  function pickCell() {
+    let best = null;
+    let bestOpts = null;
+    for (let r = 0; r < size; r += 1) {
+      for (let c = 0; c < size; c += 1) {
+        if (grid[r][c] !== 0) continue;
+        const opts = candidateValues(r, c);
+        if (!opts.length) return { r, c, opts };
+        if (!best || opts.length < bestOpts.length) {
+          best = { r, c, opts };
+          bestOpts = opts;
+          if (opts.length === 1) return best;
+        }
+      }
+    }
+    return best;
+  }
+
+  function solve(limit = 2_000_000) {
+    if (limit <= 0) return false;
+    const cell = pickCell();
+    if (!cell) return true;
+    if (!cell.opts.length) return false;
+
+    const opts = cell.opts.slice();
+    for (let i = opts.length - 1; i > 0; i -= 1) {
+      const j = randomInt(i + 1);
+      [opts[i], opts[j]] = [opts[j], opts[i]];
+    }
+
+    for (const n of opts) {
+      grid[cell.r][cell.c] = n;
+      rowUsed[cell.r].add(n);
+      colUsed[cell.c].add(n);
+      let bIdx = -1;
+      if (appState.config.useBlocks) {
+        bIdx = blockIndex(cell.r, cell.c);
+        blockUsed[bIdx].add(n);
       }
 
-      const idx = Math.floor(Math.random() * pool.length);
-      const original = pool.splice(idx, 1)[0];
-      selected.push(this.substituteExercise(original, focus, profile));
-    }
+      const prevRow = updateLineStateWithPlacement(rows[cell.r], n, size);
+      const prevCol = updateLineStateWithPlacement(cols[cell.c], n, size);
 
-    return selected;
-  },
-  buildPlan(profile) {
-    const dayName = this.getDayName(ui.sessionDate.value);
-    let focus = this.getFocusForDay(dayName);
-    if (["Mobility / Recovery", "Core + Conditioning", "Cardio + Recovery", "Rest"].includes(focus)) {
-      focus = "Total Body";
-    }
+      if (solve(limit - 1)) return true;
 
-    const selected = this.pickExercises(focus, profile, 4);
-    const rounds = [];
-    for (let r = 0; r < 4; r += 1) {
-      const exA = selected[r * 2];
-      const exB = selected[r * 2 + 1];
-      rounds.push({
-        name: `Round ${r + 1}`,
-        mode: r % 2 === 0 ? "Superset" : "Alternating",
-        exercises: [exA, exB].map((ex, idx) => ({
-          ...ex,
-          instanceId: `r${r + 1}_e${idx + 1}_${ex.name}`,
-          sets: 3,
-          reps: ex.type === "conditioning" ? "40s work" : "8-12 reps",
-          restSeconds: ex.type === "conditioning" ? 40 : 60,
-          targetWeight: ProgressionAgent.getTargetWeight(profile, ex, profile.level)
-        }))
-      });
+      rows[cell.r].trend = prevRow.trend;
+      rows[cell.r].last = prevRow.last;
+      cols[cell.c].trend = prevCol.trend;
+      cols[cell.c].last = prevCol.last;
+      grid[cell.r][cell.c] = 0;
+      rowUsed[cell.r].delete(n);
+      colUsed[cell.c].delete(n);
+      if (appState.config.useBlocks) blockUsed[bIdx].delete(n);
     }
-
-    return {
-      id: `session_${Date.now()}`,
-      date: ui.sessionDate.value,
-      dayName,
-      focus,
-      warmup: ["5 min easy cardio", "Dynamic mobility: hips, shoulders, thoracic spine", "2 ramp-up sets for first exercise"],
-      cooldown: ["3 min slow breathing", "5 min full-body stretch", "Light walk to normalize heart rate"],
-      rounds
-    };
+    return false;
   }
-};
 
-const AIAgent = {
-  async getWorkoutSuggestion(profile, plan) {
-    const recentLogs = profile.logs.slice(-5);
-    const payload = {
-      profile: {
-        name: profile.name,
-        bodyWeightKg: profile.bodyWeightKg,
-        level: profile.level,
-        injuries: profile.injuries,
-        equipment: profile.equipment
-      },
-      plan,
-      recentLogs
-    };
+  return solve();
+}
 
-    const response = await fetch("/api/ai/suggestions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+function makePuzzle(config) {
+  for (let attempts = 0; attempts < 40; attempts += 1) {
+    const solution = generateSolvedBoard(config);
+    const size = config.size;
+    const puzzle = solution.map((row) => row.slice());
+    const givenMask = initializeBoolGrid(size, true);
 
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(message || "Failed to get AI suggestion.");
+    const allCells = [];
+    for (let r = 0; r < size; r += 1) {
+      for (let c = 0; c < size; c += 1) allCells.push({ r, c });
     }
 
-    const data = await response.json();
-    return data.suggestion || "No suggestion returned.";
+    for (let i = allCells.length - 1; i > 0; i -= 1) {
+      const j = randomInt(i + 1);
+      [allCells[i], allCells[j]] = [allCells[j], allCells[i]];
+    }
+
+    const toRemove = Math.floor(size * size * config.maskRatio);
+    for (let i = 0; i < toRemove; i += 1) {
+      const { r, c } = allCells[i];
+      puzzle[r][c] = 0;
+      givenMask[r][c] = false;
+    }
+
+    const rowInitialTrends = buildInitialTrends(size, config.rowTrends);
+    const colInitialTrends = buildInitialTrends(size, config.colTrends);
+
+    const lineStates = computeLineStates(
+      puzzle,
+      givenMask,
+      [],
+      rowInitialTrends,
+      colInitialTrends,
+      config
+    );
+
+    const boardCopy = puzzle.map((row) => row.slice());
+    if (isSolvableAfterMove(boardCopy, lineStates)) {
+      return { solution, puzzle, givenMask, rowInitialTrends, colInitialTrends };
+    }
   }
-};
-
-function roundToPlate(value) {
-  return Math.max(2.5, Math.round(value / 2.5) * 2.5);
+  throw new Error("Failed to build solvable puzzle.");
 }
 
-function estimateCalories(weightKg, met, minutes) {
-  return (met * 3.5 * weightKg * minutes) / 200;
-}
+function startGame(difficultyKey) {
+  const config = DIFFICULTIES[difficultyKey];
+  if (!config) return;
 
-function renderWeeklySplit() {
-  const wrap = document.createElement("div");
-  wrap.className = "split-grid";
-  Object.entries(splitTemplate).forEach(([day, split]) => {
-    const item = document.createElement("div");
-    item.className = "split-day";
-    item.innerHTML = `<strong>${day}</strong><span>${split}</span>`;
-    wrap.appendChild(item);
-  });
-  ui.weeklySplit.innerHTML = "";
-  ui.weeklySplit.appendChild(wrap);
-}
+  const puzzle = makePuzzle(config);
 
-function renderPlan(plan) {
-  const top = document.createElement("div");
-  top.innerHTML = `<p><strong>${plan.dayName}</strong> focus: <strong>${plan.focus}</strong> | Profile: <strong>${ProfileAgent.getActiveProfile().name}</strong></p>`;
+  appState.config = config;
+  appState.size = config.size;
+  appState.solution = puzzle.solution;
+  appState.grid = puzzle.puzzle;
+  appState.givenMask = puzzle.givenMask;
+  appState.userOrder = [];
+  appState.rowInitialTrends = puzzle.rowInitialTrends;
+  appState.colInitialTrends = puzzle.colInitialTrends;
+  appState.selected = null;
+  appState.lastInvalid = null;
+  appState.solved = false;
 
-  const warmup = document.createElement("div");
-  warmup.innerHTML = `<h3>Warm-up</h3><p>${plan.warmup.join(" • ")}</p>`;
+  appState.lineStates = computeLineStates(
+    appState.grid,
+    appState.givenMask,
+    appState.userOrder,
+    appState.rowInitialTrends,
+    appState.colInitialTrends,
+    appState.config
+  );
 
-  const roundsWrap = document.createElement("div");
-  plan.rounds.forEach((round) => {
-    const card = document.createElement("div");
-    card.className = "plan-round";
-    const rows = round.exercises
-      .map((ex) => {
-        const load = ex.targetWeight > 0 ? `${ex.targetWeight} kg` : "Bodyweight / pace";
-        const subText = ex.substitutedFrom ? ` (substituted for ${ex.substitutedFrom})` : "";
-        return `<li><strong>${ex.name}</strong>${subText} - ${ex.sets} sets x ${ex.reps}, target: ${load}, rest: ${ex.restSeconds}s</li>`;
-      })
-      .join("");
-    card.innerHTML = `<h3>${round.name} (${round.mode})</h3><ul>${rows}</ul>`;
-    roundsWrap.appendChild(card);
-  });
+  ui.landing.classList.add("hidden");
+  ui.game.classList.remove("hidden");
+  ui.winPanel.classList.add("hidden");
+  ui.winPanel.classList.remove("flex");
+  ui.difficultyLabel.textContent = `${config.label} • ${config.size}x${config.size}`;
+  ui.statusText.textContent = "Select a cell and enter a number.";
 
-  const cooldown = document.createElement("div");
-  cooldown.innerHTML = `<h3>Cooldown</h3><p>${plan.cooldown.join(" • ")}</p>`;
-
-  ui.planOutput.innerHTML = "";
-  ui.planOutput.append(top, warmup, roundsWrap, cooldown);
-}
-
-function renderCalories(plan, profile) {
-  const weightKg = Number(profile.bodyWeightKg || 75);
-  let total = estimateCalories(weightKg, 4.0, 10);
-
-  plan.rounds.forEach((round) => {
-    round.exercises.forEach((ex) => {
-      total += estimateCalories(weightKg, ex.met || 6.0, 9);
-    });
-  });
-  total += estimateCalories(weightKg, 2.8, 8);
-
-  ui.calorieOutput.textContent = `Estimated burn: ${Math.round(total)} kcal (weight ${weightKg} kg, interval + exercise intensity model).`;
-}
-
-function renderLogTable(plan) {
-  const exercises = plan.rounds.flatMap((r) => r.exercises);
-  const rows = exercises
-    .map((ex) => {
-      const load = ex.targetWeight > 0 ? `${ex.targetWeight} kg` : "BW/pace";
-      return `<tr>
-        <td>${ex.name}</td>
-        <td>${load}</td>
-        <td><input type="number" min="0" id="${ex.instanceId}_reps_1" /></td>
-        <td><input type="number" min="1" max="10" step="0.5" id="${ex.instanceId}_rpe_1" /></td>
-        <td><input type="number" min="0" id="${ex.instanceId}_reps_2" /></td>
-        <td><input type="number" min="1" max="10" step="0.5" id="${ex.instanceId}_rpe_2" /></td>
-        <td><input type="number" min="0" id="${ex.instanceId}_reps_3" /></td>
-        <td><input type="number" min="1" max="10" step="0.5" id="${ex.instanceId}_rpe_3" /></td>
-      </tr>`;
-    })
-    .join("");
-
-  ui.logOutput.innerHTML = `<div class="log-table-wrap"><table class="log-table">
-    <thead>
-      <tr>
-        <th>Exercise</th><th>Target</th>
-        <th>S1 Reps</th><th>S1 RPE</th>
-        <th>S2 Reps</th><th>S2 RPE</th>
-        <th>S3 Reps</th><th>S3 RPE</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table></div>`;
-  ui.saveLog.disabled = false;
-}
-
-function collectSetLogEntries(plan) {
-  return plan.rounds
-    .flatMap((r) => r.exercises)
-    .map((ex) => {
-      const sets = [1, 2, 3].map((setNo) => ({
-        reps: Number(document.getElementById(`${ex.instanceId}_reps_${setNo}`).value),
-        rpe: Number(document.getElementById(`${ex.instanceId}_rpe_${setNo}`).value)
-      }));
-      return { exercise: ex, targetWeight: ex.targetWeight, sets };
-    });
-}
-
-function createTimerQueue(plan) {
-  const steps = [{ label: "Warm-up", seconds: 10 * 60 }];
-  plan.rounds.forEach((round, i) => {
-    steps.push({ label: `${round.name} setup`, seconds: 30 });
-    for (let set = 1; set <= 3; set += 1) {
-      round.exercises.forEach((ex) => {
-        const work = ex.type === "conditioning" ? 40 : 45;
-        steps.push({ label: `${round.name} - ${ex.name} (Set ${set}/3)`, seconds: work });
-        steps.push({ label: "Rest", seconds: ex.restSeconds });
-      });
-    }
-    if (i < plan.rounds.length - 1) steps.push({ label: "Round break", seconds: 60 });
-  });
-  steps.push({ label: "Cooldown", seconds: 8 * 60 });
-  return steps;
-}
-
-function formatSeconds(total) {
-  const m = String(Math.floor(total / 60)).padStart(2, "0");
-  const s = String(total % 60).padStart(2, "0");
-  return `${m}:${s}`;
-}
-
-function startTimerFlow() {
-  if (!appState.timerQueue.length) return;
+  appState.gameStartMs = Date.now();
   if (appState.timerId) clearInterval(appState.timerId);
-  startStep(appState.queueIndex);
-}
-
-function startStep(index) {
-  if (index >= appState.timerQueue.length) {
-    finalizeSession();
-    return;
-  }
-
-  appState.activeStep = appState.timerQueue[index];
-  appState.timerSeconds = appState.activeStep.seconds;
-  ui.timerLabel.textContent = appState.activeStep.label;
-  ui.timerValue.textContent = formatSeconds(appState.timerSeconds);
-
   appState.timerId = setInterval(() => {
-    appState.timerSeconds -= 1;
-    ui.timerValue.textContent = formatSeconds(Math.max(appState.timerSeconds, 0));
-    if (appState.timerSeconds <= 0) {
-      clearInterval(appState.timerId);
-      appState.queueIndex += 1;
-      startStep(appState.queueIndex);
-    }
+    ui.timerValue.textContent = formatTime(Date.now() - appState.gameStartMs);
   }, 1000);
-}
-
-function skipCurrentStep() {
-  if (!appState.timerQueue.length) return;
-  if (appState.timerId) clearInterval(appState.timerId);
-  appState.queueIndex += 1;
-  startStep(appState.queueIndex);
-}
-
-function finalizeSession() {
-  ui.timerLabel.textContent = "Session complete";
   ui.timerValue.textContent = "00:00";
-  ui.startTimer.disabled = true;
-  ui.skipStep.disabled = true;
-  ui.completionOutput.textContent = "Session complete. Save set performance to update next weight targets.";
+
+  renderGrid();
 }
 
-function handleBuildPlan() {
-  ProfileAgent.syncFormToProfile();
-  const profile = ProfileAgent.getActiveProfile();
-  const plan = PlanningAgent.buildPlan(profile);
-  appState.currentPlan = plan;
-  appState.timerQueue = createTimerQueue(plan);
-  appState.queueIndex = 0;
-
-  renderPlan(plan);
-  renderCalories(plan, profile);
-  renderLogTable(plan);
-
-  ui.startTimer.disabled = false;
-  ui.skipStep.disabled = false;
-  ui.getAiSuggestion.disabled = false;
-  ui.completionOutput.textContent = "Plan built. Run session and save set performance for smarter progression.";
-  ui.aiSuggestionOutput.textContent = "Plan ready. Click 'Get AI Suggestion' for personalized adjustments.";
+function arrowChar(trend) {
+  return trend === 1 ? "↑" : "↓";
 }
 
-function savePerformanceLog() {
-  if (!appState.currentPlan) return;
-
-  const profile = ProfileAgent.getActiveProfile();
-  const entries = collectSetLogEntries(appState.currentPlan);
-
-  profile.logs.push({
-    sessionId: appState.currentPlan.id,
-    date: appState.currentPlan.date,
-    focus: appState.currentPlan.focus,
-    entries: entries.map((entry) => ({
-      exerciseName: entry.exercise.name,
-      targetWeight: entry.targetWeight,
-      sets: entry.sets
-    }))
-  });
-
-  ProgressionAgent.updateFromSetLog(profile, entries);
-  DataAgent.saveStore(appState.store);
-  ui.completionOutput.textContent = "Set performance saved. Next workouts will adapt weights by reps and RPE.";
+function createArrowCell(type, index, trend) {
+  const el = document.createElement("div");
+  el.className = `arrow-cell ${trend === 1 ? "rising" : "falling"}`;
+  el.dataset.arrowType = type;
+  el.dataset.arrowIndex = String(index);
+  el.textContent = arrowChar(trend);
+  return el;
 }
 
-async function requestAiSuggestion() {
-  if (!appState.currentPlan) {
-    ui.aiSuggestionOutput.textContent = "Build a workout plan first.";
+function renderGrid() {
+  const size = appState.size;
+  const board = document.createElement("div");
+  board.className = "grid-board";
+  board.style.gridTemplateColumns = `repeat(${size + 1}, var(--cell-size))`;
+
+  const corner = document.createElement("div");
+  corner.className = "corner-cell";
+  board.appendChild(corner);
+
+  for (let c = 0; c < size; c += 1) {
+    const trend = appState.config.colTrends ? appState.lineStates.colStates[c].trend : 1;
+    const arrow = createArrowCell("col", c, trend);
+    if (!appState.config.colTrends) {
+      arrow.textContent = "·";
+      arrow.classList.remove("rising", "falling");
+    }
+    board.appendChild(arrow);
+  }
+
+  for (let r = 0; r < size; r += 1) {
+    const rowTrend = appState.config.rowTrends ? appState.lineStates.rowStates[r].trend : 1;
+    const rowArrow = createArrowCell("row", r, rowTrend);
+    if (!appState.config.rowTrends) {
+      rowArrow.textContent = "·";
+      rowArrow.classList.remove("rising", "falling");
+    }
+    board.appendChild(rowArrow);
+
+    for (let c = 0; c < size; c += 1) {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "grid-cell";
+      cell.dataset.r = String(r);
+      cell.dataset.c = String(c);
+
+      const val = appState.grid[r][c];
+      cell.textContent = val ? String(val) : "";
+      if (appState.givenMask[r][c]) cell.classList.add("given");
+
+      if (appState.selected && appState.selected.r === r && appState.selected.c === c) {
+        cell.classList.add("selected");
+      }
+
+      if (appState.selected && (appState.selected.r === r || appState.selected.c === c)) {
+        cell.classList.add("highlight");
+      }
+
+      if (appState.lastInvalid && appState.lastInvalid.r === r && appState.lastInvalid.c === c) {
+        cell.classList.add("invalid");
+      }
+
+      if (appState.config.useBlocks) {
+        const b = blockSizeFor(size);
+        if ((c + 1) % b === 0 && c < size - 1) cell.classList.add("block-right");
+        if ((r + 1) % b === 0 && r < size - 1) cell.classList.add("block-bottom");
+      }
+
+      cell.addEventListener("click", () => selectCell(r, c));
+      board.appendChild(cell);
+    }
+  }
+
+  ui.gridWrap.innerHTML = "";
+  ui.gridWrap.appendChild(board);
+  syncResetButtons();
+}
+
+function selectCell(r, c) {
+  appState.selected = { r, c };
+  appState.lastInvalid = null;
+  const cellType = appState.givenMask[r][c] ? "sealed hint cell" : "editable cell";
+  ui.statusText.textContent = `Selected R${r + 1} C${c + 1} (${cellType}).`;
+  renderGrid();
+}
+
+function getNextOrder() {
+  if (!appState.userOrder.length) return 1;
+  return Math.max(...appState.userOrder.map((x) => x.order)) + 1;
+}
+
+function setCellValue(r, c, value) {
+  appState.grid[r][c] = value;
+  appState.userOrder = appState.userOrder.filter((e) => !(e.r === r && e.c === c));
+  if (value > 0) appState.userOrder.push({ r, c, order: getNextOrder() });
+
+  appState.lineStates = computeLineStates(
+    appState.grid,
+    appState.givenMask,
+    appState.userOrder,
+    appState.rowInitialTrends,
+    appState.colInitialTrends,
+    appState.config
+  );
+}
+
+function updateArrowIfFlipped(type, index, prevTrend, nextTrend) {
+  if (prevTrend === nextTrend) return;
+  const selector = `.arrow-cell[data-arrow-type="${type}"][data-arrow-index="${index}"]`;
+  const el = ui.gridWrap.querySelector(selector);
+  if (!el) return;
+  el.classList.remove("rising", "falling", "flip");
+  el.classList.add(nextTrend === 1 ? "rising" : "falling");
+  el.textContent = arrowChar(nextTrend);
+  void el.offsetWidth;
+  el.classList.add("flip");
+}
+
+function tryPlaceSelected(value) {
+  if (!appState.selected || appState.solved) return;
+  const { r, c } = appState.selected;
+  if (appState.givenMask[r][c]) {
+    ui.statusText.textContent = "Cannot edit a pre-filled hint cell.";
     return;
   }
 
-  ProfileAgent.syncFormToProfile();
-  const profile = ProfileAgent.getActiveProfile();
+  const prevLineStates = deepCopyLineStates(appState.lineStates);
+  const prevValue = appState.grid[r][c];
+  const prevUserOrder = appState.userOrder.map((e) => ({ ...e }));
 
-  ui.getAiSuggestion.disabled = true;
-  ui.aiSuggestionOutput.textContent = "Generating AI suggestion...";
-  try {
-    const suggestion = await AIAgent.getWorkoutSuggestion(profile, appState.currentPlan);
-    ui.aiSuggestionOutput.textContent = suggestion;
-  } catch (error) {
-    ui.aiSuggestionOutput.textContent = `AI suggestion failed: ${error.message}`;
-  } finally {
-    ui.getAiSuggestion.disabled = false;
+  if (value === 0) {
+    setCellValue(r, c, 0);
+    appState.lastInvalid = null;
+    ui.statusText.textContent = `Cleared R${r + 1} C${c + 1}.`;
+    renderGrid();
+    return;
   }
+
+  const orderBefore = appState.userOrder.filter((e) => !(e.r === r && e.c === c));
+  const boardBase = appState.grid.map((row) => row.slice());
+  boardBase[r][c] = 0;
+  const boardCopy = boardBase.map((row) => row.slice());
+  boardCopy[r][c] = value;
+  const lineStatesBefore = computeLineStates(
+    boardBase,
+    appState.givenMask,
+    orderBefore,
+    appState.rowInitialTrends,
+    appState.colInitialTrends,
+    appState.config
+  );
+
+  const legal = checkMoveLegality(r, c, value, boardCopy, lineStatesBefore);
+  if (!legal.legal) {
+    appState.lastInvalid = { r, c };
+    ui.statusText.textContent = legal.reason;
+    renderGrid();
+    return;
+  }
+
+  setCellValue(r, c, value);
+
+  const boardForSolve = appState.grid.map((row) => row.slice());
+  const statesForSolve = deepCopyLineStates(appState.lineStates);
+  const solvable = isSolvableAfterMove(boardForSolve, statesForSolve);
+
+  if (!solvable) {
+    appState.grid[r][c] = prevValue;
+    appState.userOrder = prevUserOrder;
+    appState.lineStates = prevLineStates;
+    appState.lastInvalid = { r, c };
+    ui.statusText.textContent = "Move rejected: creates an unsolvable thermal lock-out.";
+    renderGrid();
+    return;
+  }
+
+  appState.lastInvalid = null;
+  ui.statusText.textContent = `Placed ${value} at R${r + 1} C${c + 1}.`;
+  renderGrid();
+
+  if (appState.config.rowTrends) {
+    updateArrowIfFlipped(
+      "row",
+      r,
+      lineStatesBefore.rowStates[r].trend,
+      appState.lineStates.rowStates[r].trend
+    );
+  }
+  if (appState.config.colTrends) {
+    updateArrowIfFlipped(
+      "col",
+      c,
+      lineStatesBefore.colStates[c].trend,
+      appState.lineStates.colStates[c].trend
+    );
+  }
+
+  checkWin();
 }
 
-function bindEvents() {
-  ui.buildPlan.addEventListener("click", handleBuildPlan);
-  ui.getAiSuggestion.addEventListener("click", requestAiSuggestion);
-  ui.startTimer.addEventListener("click", startTimerFlow);
-  ui.skipStep.addEventListener("click", skipCurrentStep);
-  ui.saveLog.addEventListener("click", savePerformanceLog);
+function isBoardCompleteAndValid() {
+  const size = appState.size;
 
-  ui.profileSelect.addEventListener("change", () => {
-    appState.store.activeProfileId = ui.profileSelect.value;
-    DataAgent.saveStore(appState.store);
-    ProfileAgent.syncProfileToForm();
-    ui.completionOutput.textContent = "Switched active profile.";
-  });
+  for (let r = 0; r < size; r += 1) {
+    const set = new Set(appState.grid[r]);
+    if (set.has(0) || set.size !== size) return false;
+  }
 
-  ui.addProfile.addEventListener("click", () => ProfileAgent.addProfile(ui.newProfileName.value));
-  ui.deleteProfile.addEventListener("click", () => ProfileAgent.deleteActiveProfile());
+  for (let c = 0; c < size; c += 1) {
+    const set = new Set();
+    for (let r = 0; r < size; r += 1) set.add(appState.grid[r][c]);
+    if (set.has(0) || set.size !== size) return false;
+  }
 
-  [ui.bodyWeight, ui.level, ui.injuries, ui.eqBarbell, ui.eqDumbbell, ui.eqCable, ui.eqKettlebell, ui.eqBodyweight, ui.eqMachine]
-    .forEach((el) => el.addEventListener("change", () => ProfileAgent.syncFormToProfile()));
+  if (appState.config.useBlocks) {
+    const b = blockSizeFor(size);
+    for (let sr = 0; sr < size; sr += b) {
+      for (let sc = 0; sc < size; sc += b) {
+        const set = new Set();
+        for (let r = sr; r < sr + b; r += 1) {
+          for (let c = sc; c < sc + b; c += 1) {
+            set.add(appState.grid[r][c]);
+          }
+        }
+        if (set.size !== size) return false;
+      }
+    }
+  }
 
-  ui.exportData.addEventListener("click", () => ProfileAgent.exportData());
-  ui.importDataBtn.addEventListener("click", () => ui.importDataFile.click());
-  ui.importDataFile.addEventListener("change", async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    ProfileAgent.importData(text);
-    event.target.value = "";
-  });
+  for (let r = 0; r < size; r += 1) {
+    for (let c = 0; c < size; c += 1) {
+      if (appState.grid[r][c] !== appState.solution[r][c]) return false;
+    }
+  }
 
-  ui.qaBuild.addEventListener("click", handleBuildPlan);
-  ui.qaStart.addEventListener("click", startTimerFlow);
-  ui.qaSave.addEventListener("click", savePerformanceLog);
-  ui.qaAi.addEventListener("click", requestAiSuggestion);
-
-  window.addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    ui.installAppBtn.hidden = false;
-  });
-
-  ui.installAppBtn.addEventListener("click", async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    deferredInstallPrompt = null;
-    ui.installAppBtn.hidden = true;
-  });
-
-  window.addEventListener("appinstalled", () => {
-    deferredInstallPrompt = null;
-    ui.installAppBtn.hidden = true;
-  });
+  return true;
 }
 
-function init() {
-  appState.store = DataAgent.loadStore();
-  const today = new Date();
-  ui.sessionDate.value = today.toISOString().split("T")[0];
-  ui.getAiSuggestion.disabled = true;
-  ProfileAgent.renderProfileSelect();
-  ProfileAgent.syncProfileToForm();
-  renderWeeklySplit();
-  bindEvents();
+function checkWin() {
+  if (appState.solved) return;
+  if (!isBoardCompleteAndValid()) return;
 
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      ui.completionOutput.textContent = "Service worker registration failed. App still works online.";
+  appState.solved = true;
+  clearInterval(appState.timerId);
+  appState.timerId = null;
+
+  const elapsed = Date.now() - appState.gameStartMs;
+  ui.winTime.textContent = `Stabilization time: ${formatTime(elapsed)}`;
+  ui.winPanel.classList.remove("hidden");
+  ui.winPanel.classList.add("flex");
+}
+
+function clearSelectedRow() {
+  if (!appState.selected || appState.solved) return;
+  const r = appState.selected.r;
+  for (let c = 0; c < appState.size; c += 1) {
+    if (!appState.givenMask[r][c]) setCellValue(r, c, 0);
+  }
+  appState.lastInvalid = null;
+  ui.statusText.textContent = `Row ${r + 1} reset.`;
+  renderGrid();
+}
+
+function clearSelectedCol() {
+  if (!appState.selected || appState.solved) return;
+  const c = appState.selected.c;
+  for (let r = 0; r < appState.size; r += 1) {
+    if (!appState.givenMask[r][c]) setCellValue(r, c, 0);
+  }
+  appState.lastInvalid = null;
+  ui.statusText.textContent = `Column ${c + 1} reset.`;
+  renderGrid();
+}
+
+function syncResetButtons() {
+  const enabled = Boolean(appState.selected) && !appState.solved;
+  ui.resetRowBtn.disabled = !enabled;
+  ui.resetColBtn.disabled = !enabled;
+}
+
+function wireEvents() {
+  document.querySelectorAll(".difficulty-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      startGame(btn.dataset.difficulty);
     });
-  }
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (!appState.config || appState.solved) return;
+
+    const key = event.key;
+    if (/^[1-9]$/.test(key)) {
+      const val = Number(key);
+      if (val <= appState.size) {
+        event.preventDefault();
+        tryPlaceSelected(val);
+      }
+    } else if (key === "Backspace" || key === "Delete" || key === "0") {
+      event.preventDefault();
+      tryPlaceSelected(0);
+    } else if (key === "ArrowUp" && appState.selected) {
+      event.preventDefault();
+      selectCell(Math.max(0, appState.selected.r - 1), appState.selected.c);
+    } else if (key === "ArrowDown" && appState.selected) {
+      event.preventDefault();
+      selectCell(Math.min(appState.size - 1, appState.selected.r + 1), appState.selected.c);
+    } else if (key === "ArrowLeft" && appState.selected) {
+      event.preventDefault();
+      selectCell(appState.selected.r, Math.max(0, appState.selected.c - 1));
+    } else if (key === "ArrowRight" && appState.selected) {
+      event.preventDefault();
+      selectCell(appState.selected.r, Math.min(appState.size - 1, appState.selected.c + 1));
+    }
+  });
+
+  ui.resetRowBtn.addEventListener("click", clearSelectedRow);
+  ui.resetColBtn.addEventListener("click", clearSelectedCol);
+
+  ui.restartBtn.addEventListener("click", () => {
+    if (!appState.config) return;
+    startGame(Object.keys(DIFFICULTIES).find((k) => DIFFICULTIES[k] === appState.config));
+  });
+
+  ui.backBtn.addEventListener("click", () => {
+    if (appState.timerId) clearInterval(appState.timerId);
+    appState.timerId = null;
+    appState.config = null;
+    appState.selected = null;
+    appState.solved = false;
+    ui.game.classList.add("hidden");
+    ui.winPanel.classList.add("hidden");
+    ui.winPanel.classList.remove("flex");
+    ui.landing.classList.remove("hidden");
+  });
+
+  ui.playAgainBtn.addEventListener("click", () => {
+    if (!appState.config) return;
+    startGame(Object.keys(DIFFICULTIES).find((k) => DIFFICULTIES[k] === appState.config));
+  });
 }
 
-init();
+wireEvents();

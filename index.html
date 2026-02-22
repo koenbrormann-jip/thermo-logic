@@ -2,132 +2,100 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#1f6a5c" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Workout Coach" />
-    <title>Workout Coach</title>
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#121212" />
+    <title>Thermo-Logic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <main class="app">
-      <header>
-        <h1>Workout Coach</h1>
-        <p>Smart split planning, progression, timers, and calorie estimates.</p>
-        <div class="button-row">
-          <button id="installAppBtn" type="button" hidden>Install App</button>
-        </div>
-      </header>
+  <body class="min-h-screen bg-[#121212] text-slate-100">
+    <div class="reactor-bg"></div>
 
-      <section class="card controls">
-        <h2>Session Setup</h2>
-        <div class="grid">
-          <label>
-            Active profile
-            <select id="profileSelect"></select>
-          </label>
-          <label>
-            New profile name
-            <input id="newProfileName" type="text" placeholder="e.g. Alex" />
-          </label>
-          <label>
-            Profile actions
-            <div class="button-row">
-              <button id="addProfile" type="button">Add Profile</button>
-              <button id="deleteProfile" type="button" class="danger">Delete</button>
+    <main class="relative z-10 mx-auto max-w-6xl px-4 py-8">
+      <section id="landing" class="mx-auto max-w-3xl rounded-2xl border border-cyan-400/30 bg-slate-900/70 p-6 shadow-[0_0_60px_rgba(0,243,255,0.15)] backdrop-blur">
+        <p class="text-xs uppercase tracking-[0.35em] text-cyan-300">Thermo-Logic Protocol</p>
+        <h1 class="mt-2 text-4xl font-bold tracking-wide text-cyan-200">Reactor Core Calibration</h1>
+        <p class="mt-3 text-sm text-slate-300">
+          Fill the grid as a Latin Square while obeying thermal flow trends. Rising arrows require higher next placements, falling arrows require lower. Pivot at max/min flips direction instantly.
+        </p>
+
+        <div class="mt-6 grid gap-3 sm:grid-cols-2">
+          <button class="difficulty-btn" data-difficulty="stable">
+            <span>Stable</span>
+            <small>4x4 • Row Trends</small>
+          </button>
+          <button class="difficulty-btn" data-difficulty="critical">
+            <span>Critical</span>
+            <small>5x5 • Row + Col Trends</small>
+          </button>
+          <button class="difficulty-btn" data-difficulty="meltdown">
+            <span>Meltdown</span>
+            <small>6x6 • Row + Col • Fewer Hints</small>
+          </button>
+          <button class="difficulty-btn" data-difficulty="supernova">
+            <span>Supernova</span>
+            <small>9x9 • Sudoku Blocks + Trends</small>
+          </button>
+        </div>
+      </section>
+
+      <section id="game" class="hidden pb-36 md:pb-0">
+        <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-cyan-300">Active Reactor</p>
+            <h2 class="text-2xl font-semibold text-cyan-100" id="difficultyLabel"></h2>
+          </div>
+          <div class="flex items-center gap-3 rounded-xl border border-cyan-400/30 bg-slate-900/70 px-4 py-2 text-sm">
+            <span class="text-slate-300">Time:</span>
+            <span id="timerValue" class="font-mono text-cyan-200">00:00</span>
+          </div>
+        </header>
+
+        <div class="action-toolbar mb-4 flex flex-wrap gap-2">
+          <button id="resetRowBtn" class="action-btn">Reset Selected Row</button>
+          <button id="resetColBtn" class="action-btn">Reset Selected Column</button>
+          <button id="restartBtn" class="action-btn">New Puzzle</button>
+          <button id="backBtn" class="action-btn action-btn-alt">Change Difficulty</button>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div class="rounded-2xl border border-cyan-400/30 bg-slate-900/70 p-3 backdrop-blur">
+            <div id="gridWrap" class="overflow-auto"></div>
+          </div>
+
+          <aside class="space-y-3">
+            <div class="rounded-2xl border border-cyan-400/30 bg-slate-900/70 p-4">
+              <h3 class="text-sm font-semibold uppercase tracking-wider text-cyan-200">Thermal Status</h3>
+              <p id="statusText" class="mt-2 text-sm text-slate-300">Select a cell and enter a number.</p>
             </div>
-          </label>
-          <label>
-            Body weight (kg)
-            <input id="bodyWeight" type="number" min="30" max="250" value="75" />
-          </label>
-          <label>
-            Session date
-            <input id="sessionDate" type="date" />
-          </label>
-          <label>
-            Training level
-            <select id="level">
-              <option value="beginner">Beginner</option>
-              <option value="intermediate" selected>Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
-          </label>
-          <label>
-            Rounds
-            <input id="rounds" type="number" min="4" max="4" value="4" readonly />
-          </label>
-        </div>
-        <div class="grid">
-          <label>
-            Injury constraints (comma separated)
-            <input id="injuries" type="text" placeholder="knee, shoulder, lower back" />
-          </label>
-          <fieldset class="equip-field">
-            <legend>Equipment Available</legend>
-            <label><input type="checkbox" id="eqBarbell" checked /> Barbell</label>
-            <label><input type="checkbox" id="eqDumbbell" checked /> Dumbbell</label>
-            <label><input type="checkbox" id="eqCable" checked /> Cable</label>
-            <label><input type="checkbox" id="eqKettlebell" checked /> Kettlebell</label>
-            <label><input type="checkbox" id="eqBodyweight" checked /> Bodyweight</label>
-            <label><input type="checkbox" id="eqMachine" checked /> Machine</label>
-          </fieldset>
-        </div>
-        <div class="button-row">
-          <button id="exportData" type="button">Export Data</button>
-          <button id="importDataBtn" type="button">Import Data</button>
-          <input id="importDataFile" type="file" accept="application/json" hidden />
-        </div>
-        <button id="buildPlan">Build Workout Plan</button>
-      </section>
 
-      <section class="card" id="scheduleCard">
-        <h2>Recommended Weekly Split</h2>
-        <div id="weeklySplit"></div>
-      </section>
+            <div class="rounded-2xl border border-cyan-400/30 bg-slate-900/70 p-4">
+              <h3 class="text-sm font-semibold uppercase tracking-wider text-cyan-200">Controls</h3>
+              <ul class="mt-2 space-y-1 text-sm text-slate-300">
+                <li>Click a cell to select it.</li>
+                <li>Use number keys 1-9 to input.</li>
+                <li>Use Backspace/Delete/0 to clear a user value.</li>
+                <li>Reset line buttons clear only user-entered values.</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
 
-      <section class="card" id="planCard">
-        <h2>Workout Plan</h2>
-        <div id="planOutput" class="muted">Build a plan to start.</div>
-      </section>
-
-      <section class="card" id="timerCard">
-        <h2>Session Timer</h2>
-        <div class="timer-box">
-          <p class="timer-label" id="timerLabel">Waiting to start</p>
-          <p class="timer" id="timerValue">00:00</p>
-          <button id="startTimer" disabled>Start Guided Session</button>
-          <button id="skipStep" disabled>Skip Step</button>
+        <div id="mobilePad" class="mobile-pad hidden">
+          <p class="mb-2 text-[0.7rem] uppercase tracking-[0.2em] text-cyan-200/90">Input Console</p>
+          <div id="numpadKeys" class="numpad-grid"></div>
         </div>
       </section>
 
-      <section class="card" id="progressCard">
-        <h2>Progress & Calories</h2>
-        <div id="calorieOutput" class="muted">Calories will be estimated after plan generation.</div>
-        <div id="completionOutput" class="muted">Complete session to save progression.</div>
-        <div class="button-row">
-          <button id="getAiSuggestion" type="button">Get AI Suggestion</button>
+      <section id="winPanel" class="pointer-events-none fixed inset-0 z-30 hidden items-center justify-center bg-slate-950/80 px-4">
+        <div class="core-stable rounded-2xl border border-cyan-300/70 bg-slate-900/90 p-8 text-center">
+          <p class="text-xs uppercase tracking-[0.3em] text-cyan-300">Core Stabilized</p>
+          <h3 class="mt-2 text-3xl font-bold text-cyan-100">Reactor Online</h3>
+          <p id="winTime" class="mt-3 text-slate-200"></p>
+          <button id="playAgainBtn" class="action-btn mt-5">Run New Simulation</button>
         </div>
-        <div id="aiSuggestionOutput" class="muted">Build a plan, then ask AI for workout and progression suggestions.</div>
-      </section>
-
-      <section class="card" id="logCard">
-        <h2>Set Logging</h2>
-        <div id="logOutput" class="muted">Build a workout plan to log reps and RPE per set.</div>
-        <button id="saveLog" type="button" disabled>Save Set Performance</button>
       </section>
     </main>
-
-    <nav class="mobile-quick-actions" aria-label="Quick actions">
-      <button id="qaBuild" type="button">Build</button>
-      <button id="qaStart" type="button">Start</button>
-      <button id="qaSave" type="button">Save</button>
-      <button id="qaAi" type="button">AI</button>
-    </nav>
 
     <script src="app.js"></script>
   </body>
