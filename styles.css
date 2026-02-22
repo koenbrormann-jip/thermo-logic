@@ -95,6 +95,10 @@ body {
   touch-action: manipulation;
 }
 
+#gridWrap {
+  -webkit-overflow-scrolling: touch;
+}
+
 .grid-cell,
 .arrow-cell,
 .corner-cell {

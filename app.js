@@ -15,6 +15,7 @@ const appState = {
   selected: null,
   rowInitialTrends: [],
   colInitialTrends: [],
+  witnessOrder: [],
   lineStates: null,
   lastInvalid: null,
   gameStartMs: 0,
@@ -33,6 +34,8 @@ const ui = {
   resetColBtn: document.getElementById("resetColBtn"),
   restartBtn: document.getElementById("restartBtn"),
   backBtn: document.getElementById("backBtn"),
+  mobilePad: document.getElementById("mobilePad"),
+  numpadKeys: document.getElementById("numpadKeys"),
   winPanel: document.getElementById("winPanel"),
   winTime: document.getElementById("winTime"),
   playAgainBtn: document.getElementById("playAgainBtn")
@@ -69,6 +72,17 @@ function initializeBoolGrid(size, value = false) {
 
 function blockSizeFor(size) {
   return size === 9 ? 3 : 0;
+}
+
+function computeCellSizePx(size) {
+  const mobile = window.matchMedia("(max-width: 768px)").matches;
+  const wrapWidth = Math.max(280, ui.gridWrap.clientWidth || window.innerWidth - 32);
+  const totalCells = size + 1;
+  const totalGaps = (totalCells - 1) * 2;
+  const rough = Math.floor((wrapWidth - totalGaps - 8) / totalCells);
+  const minPx = mobile ? 30 : 38;
+  const maxPx = mobile ? 52 : 60;
+  return Math.max(minPx, Math.min(maxPx, rough));
 }
 
 function generateSolvedBoard(config) {
@@ -142,9 +156,26 @@ function generateSolvedBoard(config) {
   return grid;
 }
 
-function buildInitialTrends(size, applies) {
+function buildUniformTrends(size, applies, trend) {
   if (!applies) return Array(size).fill(1);
-  return Array.from({ length: size }, () => (Math.random() < 0.5 ? 1 : -1));
+  return Array(size).fill(trend);
+}
+
+function buildWitnessOrder(solution, givenMask, trend) {
+  const empties = [];
+  for (let r = 0; r < solution.length; r += 1) {
+    for (let c = 0; c < solution.length; c += 1) {
+      if (!givenMask[r][c]) empties.push({ r, c });
+    }
+  }
+
+  // Tie-breaker randomizes equal-valued cells while preserving global monotonicity.
+  return empties.sort((a, b) => {
+    const av = solution[a.r][a.c];
+    const bv = solution[b.r][b.c];
+    if (av !== bv) return trend === 1 ? av - bv : bv - av;
+    return Math.random() < 0.5 ? -1 : 1;
+  });
 }
 
 function getLineStateFromOrder(values, initialTrend, maxVal) {
@@ -254,11 +285,11 @@ function deepCopyLineStates(lineStates) {
   };
 }
 
-function isSolvableAfterMove(grid, lineStates) {
-  const size = appState.size;
+function isSolvableAfterMove(grid, lineStates, config) {
+  const size = config.size;
   const rowUsed = Array.from({ length: size }, () => new Set());
   const colUsed = Array.from({ length: size }, () => new Set());
-  const blockUsed = appState.config.useBlocks ? Array.from({ length: size }, () => new Set()) : [];
+  const blockUsed = config.useBlocks ? Array.from({ length: size }, () => new Set()) : [];
 
   function blockIndex(r, c) {
     const b = blockSizeFor(size);
@@ -272,7 +303,7 @@ function isSolvableAfterMove(grid, lineStates) {
       if (rowUsed[r].has(val) || colUsed[c].has(val)) return false;
       rowUsed[r].add(val);
       colUsed[c].add(val);
-      if (appState.config.useBlocks) {
+      if (config.useBlocks) {
         const bi = blockIndex(r, c);
         if (blockUsed[bi].has(val)) return false;
         blockUsed[bi].add(val);
@@ -287,9 +318,9 @@ function isSolvableAfterMove(grid, lineStates) {
     const values = [];
     for (let n = 1; n <= size; n += 1) {
       if (rowUsed[r].has(n) || colUsed[c].has(n)) continue;
-      if (appState.config.useBlocks && blockUsed[blockIndex(r, c)].has(n)) continue;
-      if (!thermalLegalForLine(rows[r], n, appState.config.rowTrends)) continue;
-      if (!thermalLegalForLine(cols[c], n, appState.config.colTrends)) continue;
+      if (config.useBlocks && blockUsed[blockIndex(r, c)].has(n)) continue;
+      if (!thermalLegalForLine(rows[r], n, config.rowTrends)) continue;
+      if (!thermalLegalForLine(cols[c], n, config.colTrends)) continue;
       values.push(n);
     }
     return values;
@@ -330,7 +361,7 @@ function isSolvableAfterMove(grid, lineStates) {
       rowUsed[cell.r].add(n);
       colUsed[cell.c].add(n);
       let bIdx = -1;
-      if (appState.config.useBlocks) {
+      if (config.useBlocks) {
         bIdx = blockIndex(cell.r, cell.c);
         blockUsed[bIdx].add(n);
       }
@@ -347,7 +378,7 @@ function isSolvableAfterMove(grid, lineStates) {
       grid[cell.r][cell.c] = 0;
       rowUsed[cell.r].delete(n);
       colUsed[cell.c].delete(n);
-      if (appState.config.useBlocks) blockUsed[bIdx].delete(n);
+      if (config.useBlocks) blockUsed[bIdx].delete(n);
     }
     return false;
   }
@@ -356,47 +387,33 @@ function isSolvableAfterMove(grid, lineStates) {
 }
 
 function makePuzzle(config) {
-  for (let attempts = 0; attempts < 40; attempts += 1) {
-    const solution = generateSolvedBoard(config);
-    const size = config.size;
-    const puzzle = solution.map((row) => row.slice());
-    const givenMask = initializeBoolGrid(size, true);
+  const size = config.size;
+  const solution = generateSolvedBoard(config);
+  const puzzle = solution.map((row) => row.slice());
+  const givenMask = initializeBoolGrid(size, true);
 
-    const allCells = [];
-    for (let r = 0; r < size; r += 1) {
-      for (let c = 0; c < size; c += 1) allCells.push({ r, c });
-    }
-
-    for (let i = allCells.length - 1; i > 0; i -= 1) {
-      const j = randomInt(i + 1);
-      [allCells[i], allCells[j]] = [allCells[j], allCells[i]];
-    }
-
-    const toRemove = Math.floor(size * size * config.maskRatio);
-    for (let i = 0; i < toRemove; i += 1) {
-      const { r, c } = allCells[i];
-      puzzle[r][c] = 0;
-      givenMask[r][c] = false;
-    }
-
-    const rowInitialTrends = buildInitialTrends(size, config.rowTrends);
-    const colInitialTrends = buildInitialTrends(size, config.colTrends);
-
-    const lineStates = computeLineStates(
-      puzzle,
-      givenMask,
-      [],
-      rowInitialTrends,
-      colInitialTrends,
-      config
-    );
-
-    const boardCopy = puzzle.map((row) => row.slice());
-    if (isSolvableAfterMove(boardCopy, lineStates)) {
-      return { solution, puzzle, givenMask, rowInitialTrends, colInitialTrends };
-    }
+  const allCells = [];
+  for (let r = 0; r < size; r += 1) {
+    for (let c = 0; c < size; c += 1) allCells.push({ r, c });
   }
-  throw new Error("Failed to build solvable puzzle.");
+  for (let i = allCells.length - 1; i > 0; i -= 1) {
+    const j = randomInt(i + 1);
+    [allCells[i], allCells[j]] = [allCells[j], allCells[i]];
+  }
+
+  const toRemove = Math.floor(size * size * config.maskRatio);
+  for (let i = 0; i < toRemove; i += 1) {
+    const { r, c } = allCells[i];
+    puzzle[r][c] = 0;
+    givenMask[r][c] = false;
+  }
+
+  const trend = Math.random() < 0.5 ? 1 : -1;
+  const rowInitialTrends = buildUniformTrends(size, config.rowTrends, trend);
+  const colInitialTrends = buildUniformTrends(size, config.colTrends, trend);
+  const witnessOrder = buildWitnessOrder(solution, givenMask, trend);
+
+  return { solution, puzzle, givenMask, rowInitialTrends, colInitialTrends, witnessOrder };
 }
 
 function startGame(difficultyKey) {
@@ -413,6 +430,7 @@ function startGame(difficultyKey) {
   appState.userOrder = [];
   appState.rowInitialTrends = puzzle.rowInitialTrends;
   appState.colInitialTrends = puzzle.colInitialTrends;
+  appState.witnessOrder = puzzle.witnessOrder || [];
   appState.selected = null;
   appState.lastInvalid = null;
   appState.solved = false;
@@ -440,6 +458,7 @@ function startGame(difficultyKey) {
   }, 1000);
   ui.timerValue.textContent = "00:00";
 
+  renderNumpad();
   renderGrid();
 }
 
@@ -460,6 +479,8 @@ function renderGrid() {
   const size = appState.size;
   const board = document.createElement("div");
   board.className = "grid-board";
+  const cellPx = computeCellSizePx(size);
+  board.style.setProperty("--cell-size", `${cellPx}px`);
   board.style.gridTemplateColumns = `repeat(${size + 1}, var(--cell-size))`;
 
   const corner = document.createElement("div");
@@ -522,6 +543,7 @@ function renderGrid() {
   ui.gridWrap.innerHTML = "";
   ui.gridWrap.appendChild(board);
   syncResetButtons();
+  syncNumpadButtons();
 }
 
 function selectCell(r, c) {
@@ -530,6 +552,14 @@ function selectCell(r, c) {
   const cellType = appState.givenMask[r][c] ? "sealed hint cell" : "editable cell";
   ui.statusText.textContent = `Selected R${r + 1} C${c + 1} (${cellType}).`;
   renderGrid();
+}
+
+function moveSelection(dr, dc) {
+  if (!appState.selected || !appState.config) return;
+  const nextR = Math.max(0, Math.min(appState.size - 1, appState.selected.r + dr));
+  const nextC = Math.max(0, Math.min(appState.size - 1, appState.selected.c + dc));
+  if (nextR === appState.selected.r && nextC === appState.selected.c) return;
+  selectCell(nextR, nextC);
 }
 
 function getNextOrder() {
@@ -610,7 +640,7 @@ function tryPlaceSelected(value) {
 
   const boardForSolve = appState.grid.map((row) => row.slice());
   const statesForSolve = deepCopyLineStates(appState.lineStates);
-  const solvable = isSolvableAfterMove(boardForSolve, statesForSolve);
+  const solvable = isSolvableAfterMove(boardForSolve, statesForSolve, appState.config);
 
   if (!solvable) {
     appState.grid[r][c] = prevValue;
@@ -694,6 +724,7 @@ function checkWin() {
 
   const elapsed = Date.now() - appState.gameStartMs;
   ui.winTime.textContent = `Stabilization time: ${formatTime(elapsed)}`;
+  syncNumpadButtons();
   ui.winPanel.classList.remove("hidden");
   ui.winPanel.classList.add("flex");
 }
@@ -726,6 +757,47 @@ function syncResetButtons() {
   ui.resetColBtn.disabled = !enabled;
 }
 
+function syncNumpadButtons() {
+  if (!ui.numpadKeys) return;
+  const hasSelection = Boolean(appState.selected);
+  const editableSelection = hasSelection
+    && !appState.givenMask[appState.selected.r][appState.selected.c]
+    && !appState.solved;
+  ui.numpadKeys.querySelectorAll(".numpad-btn").forEach((btn) => {
+    btn.disabled = !editableSelection;
+  });
+}
+
+function renderNumpad() {
+  if (!ui.mobilePad || !ui.numpadKeys) return;
+  if (!appState.config) {
+    ui.mobilePad.classList.add("hidden");
+    ui.numpadKeys.innerHTML = "";
+    return;
+  }
+
+  const size = appState.size;
+  ui.numpadKeys.innerHTML = "";
+  for (let n = 1; n <= size; n += 1) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "numpad-btn";
+    btn.textContent = String(n);
+    btn.addEventListener("click", () => tryPlaceSelected(n));
+    ui.numpadKeys.appendChild(btn);
+  }
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "numpad-btn clear";
+  clearBtn.textContent = "Clear";
+  clearBtn.addEventListener("click", () => tryPlaceSelected(0));
+  ui.numpadKeys.appendChild(clearBtn);
+
+  ui.mobilePad.classList.remove("hidden");
+  syncNumpadButtons();
+}
+
 function wireEvents() {
   document.querySelectorAll(".difficulty-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -748,18 +820,61 @@ function wireEvents() {
       tryPlaceSelected(0);
     } else if (key === "ArrowUp" && appState.selected) {
       event.preventDefault();
-      selectCell(Math.max(0, appState.selected.r - 1), appState.selected.c);
+      moveSelection(-1, 0);
     } else if (key === "ArrowDown" && appState.selected) {
       event.preventDefault();
-      selectCell(Math.min(appState.size - 1, appState.selected.r + 1), appState.selected.c);
+      moveSelection(1, 0);
     } else if (key === "ArrowLeft" && appState.selected) {
       event.preventDefault();
-      selectCell(appState.selected.r, Math.max(0, appState.selected.c - 1));
+      moveSelection(0, -1);
     } else if (key === "ArrowRight" && appState.selected) {
       event.preventDefault();
-      selectCell(appState.selected.r, Math.min(appState.size - 1, appState.selected.c + 1));
+      moveSelection(0, 1);
     }
   });
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let touchMoved = false;
+
+  ui.gridWrap.addEventListener("touchstart", (event) => {
+    if (!appState.config || appState.solved || !event.touches.length) return;
+    const t = event.touches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+    touchStartTime = Date.now();
+    touchMoved = false;
+  }, { passive: true });
+
+  ui.gridWrap.addEventListener("touchmove", (event) => {
+    if (!appState.config || !event.touches.length) return;
+    const t = event.touches[0];
+    if (Math.abs(t.clientX - touchStartX) > 8 || Math.abs(t.clientY - touchStartY) > 8) {
+      touchMoved = true;
+    }
+  }, { passive: true });
+
+  ui.gridWrap.addEventListener("touchend", (event) => {
+    if (!appState.config || appState.solved || !appState.selected) return;
+    if (!touchMoved || !event.changedTouches.length) return;
+
+    const t = event.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    const dt = Date.now() - touchStartTime;
+    const minDistance = 24;
+    const maxDuration = 650;
+
+    if (dt > maxDuration) return;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < minDistance) return;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      moveSelection(0, dx > 0 ? 1 : -1);
+    } else {
+      moveSelection(dy > 0 ? 1 : -1, 0);
+    }
+  }, { passive: true });
 
   ui.resetRowBtn.addEventListener("click", clearSelectedRow);
   ui.resetColBtn.addEventListener("click", clearSelectedCol);
@@ -779,12 +894,31 @@ function wireEvents() {
     ui.winPanel.classList.add("hidden");
     ui.winPanel.classList.remove("flex");
     ui.landing.classList.remove("hidden");
+    if (ui.mobilePad) ui.mobilePad.classList.add("hidden");
   });
 
   ui.playAgainBtn.addEventListener("click", () => {
     if (!appState.config) return;
     startGame(Object.keys(DIFFICULTIES).find((k) => DIFFICULTIES[k] === appState.config));
   });
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    if (!appState.config) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      renderGrid();
+    }, 100);
+  });
 }
 
 wireEvents();
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    DIFFICULTIES,
+    makePuzzle,
+    computeLineStates,
+    isSolvableAfterMove
+  };
+}
